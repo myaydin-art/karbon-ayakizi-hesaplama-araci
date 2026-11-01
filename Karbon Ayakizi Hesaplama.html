@@ -1,0 +1,765 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tekstil Fabrikası Karbon Ayak İzi Yönetim Portalı</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- SheetJS (Excel Export) -->
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    <!-- FontAwesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        brand: {
+                            50: '#f0fdf4',
+                            100: '#dcfce7',
+                            500: '#22c55e',
+                            600: '#16a34a',
+                            700: '#15803d',
+                            800: '#166534',
+                            900: '#14532d',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+</head>
+<body class="bg-slate-50 text-slate-800 font-sans antialiased min-h-screen flex flex-col">
+
+    <!-- Navbar -->
+    <header class="bg-brand-900 text-white shadow-lg sticky top-0 z-50">
+        <div class="max-w-7xl mx-auto px-4 py-3 flex flex-wrap justify-between items-center">
+            <div class="flex items-center space-x-3">
+                <i class="fa-solid font-bold text-2xl fa-industry text-brand-500"></i>
+                <div>
+                    <h1 class="font-bold text-lg leading-tight" id="headerFactoryName">Tekstil Fabrikası Karbon Portalı</h1>
+                    <p class="text-xs text-brand-100">ISO 14064 & GHG Protocol Standartlarında</p>
+                </div>
+            </div>
+            <div class="flex items-center space-x-2 mt-2 sm:mt-0">
+                <button onclick="exportToExcel()" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold px-3 py-2 rounded-lg transition flex items-center gap-1.5 shadow">
+                    <i class="fa-solid fa-file-excel"></i> Excel İndir (.xlsx)
+                </button>
+                <button onclick="resetAllData()" class="bg-rose-700 hover:bg-rose-800 text-white text-xs px-2.5 py-2 rounded-lg transition" title="Verileri Sıfırla">
+                    <i class="fa-solid fa-rotate-left"></i>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Ana Konteyner -->
+    <main class="max-w-7xl mx-auto px-4 py-6 flex-grow w-full grid grid-cols-1 lg:grid-cols-12 gap-6">
+
+        <!-- Sol Panel: Ayarlar ve Veri Girişleri (7 Kolon) -->
+        <section class="lg:col-span-7 space-y-6">
+
+            <!-- Navigasyon Sekmeleri -->
+            <div class="flex border-b border-slate-200 bg-white rounded-t-xl px-2 pt-2 shadow-sm">
+                <button onclick="switchTab('entry')" id="tab-entry" class="tab-btn active px-4 py-2.5 text-sm font-semibold border-b-2 border-brand-600 text-brand-700 flex items-center gap-2">
+                    <i class="fa-solid fa-pen-to-square"></i> Emisyon Girişi
+                </button>
+                <button onclick="switchTab('factors')" id="tab-factors" class="tab-btn px-4 py-2.5 text-sm font-medium text-slate-500 hover:text-slate-700 border-b-2 border-transparent flex items-center gap-2">
+                    <i class="fa-solid fa-database"></i> Faktör Veritabanı
+                </button>
+                <button onclick="switchTab('profile')" id="tab-profile" class="tab-btn px-4 py-2.5 text-sm font-medium text-slate-500 hover:text-slate-700 border-b-2 border-transparent flex items-center gap-2">
+                    <i class="fa-solid fa-sliders"></i> Fabrika Profili
+                </button>
+            </div>
+
+            <!-- TAB 1: EMİSYON GİRİŞİ -->
+            <div id="view-entry" class="space-y-6">
+                <!-- Tarih ve Dönem Seçimi -->
+                <div class="bg-white p-4 rounded-xl shadow-sm border border-slate-200 flex flex-wrap gap-4 items-center justify-between">
+                    <div class="flex items-center gap-3">
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-500 mb-1">YIL</label>
+                            <div class="flex items-center gap-1">
+                                <!-- Dinamik ve Sonsuz Yıl Seçimi -->
+                                <select id="selectYear" onchange="handleYearChange()" class="bg-slate-50 border border-slate-300 rounded-lg px-3 py-1.5 text-sm font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-brand-500">
+                                    <!-- JS ile dinamik doldurulur -->
+                                </select>
+                                <button onclick="promptAddNewYear()" class="bg-slate-200 hover:bg-slate-300 text-slate-700 p-1.5 rounded-lg text-xs font-bold" title="Özel Yıl Ekle">
+                                    <i class="fa-solid fa-plus"></i>
+                                </button>
+                            </div>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-500 mb-1">AY</label>
+                            <select id="selectMonth" onchange="loadRecordsForCurrentPeriod()" class="bg-slate-50 border border-slate-300 rounded-lg px-3 py-1.5 text-sm font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-brand-500">
+                                <option value="Ocak">Ocak</option>
+                                <option value="Şubat">Şubat</option>
+                                <option value="Mart">Mart</option>
+                                <option value="Nisan">Nisan</option>
+                                <option value="Mayıs">Mayıs</option>
+                                <option value="Haziran">Haziran</option>
+                                <option value="Temmuz">Temmuz</option>
+                                <option value="Ağustos">Ağustos</option>
+                                <option value="Eylül">Eylül</option>
+                                <option value="Ekim" selected>Ekim</option>
+                                <option value="Kasım">Kasım</option>
+                                <option value="Aralık">Aralık</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-500 mb-1">AYLIK ÜRETİM MİKTARI (TON)</label>
+                        <input type="number" id="monthlyProductionInput" onchange="saveMonthlyProduction()" placeholder="Örn: 150" class="w-32 bg-slate-50 border border-slate-300 rounded-lg px-3 py-1.5 text-sm font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-brand-500">
+                    </div>
+                </div>
+
+                <!-- Emisyon Ekleme Formu -->
+                <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200">
+                    <h3 class="text-sm font-bold text-slate-700 mb-4 flex items-center gap-2">
+                        <i class="fa-solid fa-circle-plus text-brand-600"></i> Yeni Tüketim Kaydı Ekle
+                    </h3>
+                    <form id="emissionEntryForm" onsubmit="addEmissionRecord(event)" class="grid grid-cols-1 md:grid-cols-12 gap-3">
+                        <div class="md:col-span-3">
+                            <label class="block text-xs font-medium text-slate-600 mb-1">Kapsam (Scope)</label>
+                            <select id="entryScope" onchange="updateFactorDropdown()" class="w-full bg-slate-50 border border-slate-300 rounded-lg px-2.5 py-1.5 text-xs focus:ring-2 focus:ring-brand-500">
+                                <option value="Scope 1">Kapsam 1 (Doğrudan)</option>
+                                <option value="Scope 2">Kapsam 2 (Enerji)</option>
+                                <option value="Scope 3">Kapsam 3 (Diğer Dolaylı)</option>
+                            </select>
+                        </div>
+                        <div class="md:col-span-4">
+                            <label class="block text-xs font-medium text-slate-600 mb-1">Emisyon Türü / Kalemi</label>
+                            <select id="entryFactorId" onchange="updateFactorUnitLabel()" class="w-full bg-slate-50 border border-slate-300 rounded-lg px-2.5 py-1.5 text-xs focus:ring-2 focus:ring-brand-500">
+                                <!-- JS ile doldurulacak -->
+                            </select>
+                        </div>
+                        <div class="md:col-span-3">
+                            <label class="block text-xs font-medium text-slate-600 mb-1">Tüketim Miktarı (<span id="unitLabel">-</span>)</label>
+                            <input type="number" step="any" id="entryAmount" required placeholder="Miktar" class="w-full bg-slate-50 border border-slate-300 rounded-lg px-2.5 py-1.5 text-xs focus:ring-2 focus:ring-brand-500">
+                        </div>
+                        <div class="md:col-span-2 flex items-end">
+                            <button type="submit" class="w-full bg-brand-600 hover:bg-brand-700 text-white font-semibold text-xs py-2 rounded-lg transition shadow">
+                                Ekle
+                            </button>
+                        </div>
+                    </form>
+                </div>
+
+                <!-- Girilen Kayıtlar Tablosu -->
+                <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+                    <div class="p-4 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+                        <h4 class="text-xs font-bold text-slate-700 uppercase tracking-wider">
+                            <span id="currentPeriodLabel">-</span> Dönemi Kayıtları
+                        </h4>
+                        <span id="recordCountBadge" class="text-xs bg-slate-200 text-slate-700 px-2 py-0.5 rounded-full font-semibold">0 Kayıt</span>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left text-xs text-slate-600">
+                            <thead class="bg-slate-100 text-slate-700 border-b border-slate-200 font-semibold">
+                                <tr>
+                                    <th class="p-3">Kapsam</th>
+                                    <th class="p-3">Emisyon Kalemi</th>
+                                    <th class="p-3">Tüketim</th>
+                                    <th class="p-3">Faktör</th>
+                                    <th class="p-3">Emisyon (Ton CO₂e)</th>
+                                    <th class="p-3 text-right">İşlem</th>
+                                </tr>
+                            </thead>
+                            <tbody id="recordsTableBody" class="divide-y divide-slate-100">
+                                <!-- JS ile oluşturulacak -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- TAB 2: EMİSYON FAKTÖRLERİ DATA BÖLÜMÜ -->
+            <div id="view-factors" class="space-y-6 hidden">
+                <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200">
+                    <h3 class="text-sm font-bold text-slate-700 mb-3 flex items-center gap-2">
+                        <i class="fa-solid fa-plus-circle text-brand-600"></i> Yeni Emisyon Faktörü Tanımla
+                    </h3>
+                    <p class="text-xs text-slate-500 mb-4">Uçak ile ulaşım, yeni ham madde, kimyasal veya nakliye kalemlerini Kapsam 1, 2 veya 3 altında özgürce ekleyebilirsiniz.</p>
+                    <form id="newFactorForm" onsubmit="addNewFactor(event)" class="grid grid-cols-1 md:grid-cols-12 gap-3">
+                        <div class="md:col-span-3">
+                            <label class="block text-xs font-medium text-slate-600 mb-1">Kapsam</label>
+                            <select id="newFactorScope" class="w-full bg-slate-50 border border-slate-300 rounded-lg px-2.5 py-1.5 text-xs">
+                                <option value="Scope 1">Kapsam 1 (Doğrudan)</option>
+                                <option value="Scope 2">Kapsam 2 (Enerji)</option>
+                                <option value="Scope 3">Kapsam 3 (Diğer Dolaylı)</option>
+                            </select>
+                        </div>
+                        <div class="md:col-span-4">
+                            <label class="block text-xs font-medium text-slate-600 mb-1">Faktör/Kalem Adı</label>
+                            <input type="text" id="newFactorName" required placeholder="Örn: Uçak Ulaşım (Yolcu-km)" class="w-full bg-slate-50 border border-slate-300 rounded-lg px-2.5 py-1.5 text-xs">
+                        </div>
+                        <div class="md:col-span-2">
+                            <label class="block text-xs font-medium text-slate-600 mb-1">Birim</label>
+                            <input type="text" id="newFactorUnit" required placeholder="Örn: km, kWh, Ton" class="w-full bg-slate-50 border border-slate-300 rounded-lg px-2.5 py-1.5 text-xs">
+                        </div>
+                        <div class="md:col-span-3">
+                            <label class="block text-xs font-medium text-slate-600 mb-1">Faktör (kg CO₂e/Birim)</label>
+                            <input type="number" step="any" id="newFactorValue" required placeholder="Örn: 0.158" class="w-full bg-slate-50 border border-slate-300 rounded-lg px-2.5 py-1.5 text-xs">
+                        </div>
+                        <div class="md:col-span-12 flex justify-end">
+                            <button type="submit" class="bg-brand-600 hover:bg-brand-700 text-white font-semibold text-xs px-4 py-2 rounded-lg transition shadow">
+                                Faktör Kaydet
+                            </button>
+                        </div>
+                    </form>
+                </div>
+
+                <!-- Mevcut Faktörler Listesi -->
+                <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+                    <div class="p-4 border-b border-slate-100 bg-slate-50">
+                        <h4 class="text-xs font-bold text-slate-700 uppercase tracking-wider">Kütüphanedeki Emisyon Faktörleri</h4>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left text-xs text-slate-600">
+                            <thead class="bg-slate-100 text-slate-700 font-semibold border-b border-slate-200">
+                                <tr>
+                                    <th class="p-3">Kapsam</th>
+                                    <th class="p-3">Adı</th>
+                                    <th class="p-3">Birim</th>
+                                    <th class="p-3">Faktör Değeri (kg CO₂e/Birim)</th>
+                                    <th class="p-3 text-right">Sil</th>
+                                </tr>
+                            </thead>
+                            <tbody id="factorsTableBody" class="divide-y divide-slate-100">
+                                <!-- JS ile doldurulacak -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- TAB 3: FABRİKA PROFİLİ -->
+            <div id="view-profile" class="space-y-6 hidden">
+                <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200">
+                    <h3 class="text-sm font-bold text-slate-700 mb-4 flex items-center gap-2">
+                        <i class="fa-solid fa-building text-brand-600"></i> Tekstil Tesisi Bilgileri
+                    </h3>
+                    <form onsubmit="saveFactoryProfile(event)" class="space-y-4">
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-600 mb-1">Fabrika Ticari Ünvanı / Adı</label>
+                            <input type="text" id="profFactoryName" required placeholder="Örn: Örnek Firma San. ve Tic. A.Ş." class="w-full bg-slate-50 border border-slate-300 rounded-lg px-3 py-2 text-sm">
+                        </div>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <label class="block text-xs font-semibold text-slate-600 mb-1">Tesis Lokasyonu / Şehir</label>
+                                <input type="text" id="profLocation" placeholder="Örnek Şehir" class="w-full bg-slate-50 border border-slate-300 rounded-lg px-3 py-2 text-sm">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-semibold text-slate-600 mb-1">Çalışan Sayısı</label>
+                                <input type="number" id="profEmployees" placeholder="450" class="w-full bg-slate-50 border border-slate-300 rounded-lg px-3 py-2 text-sm">
+                            </div>
+                        </div>
+                        <div class="flex justify-end">
+                            <button type="submit" class="bg-brand-600 hover:bg-brand-700 text-white font-semibold text-xs px-5 py-2.5 rounded-lg shadow transition">
+                                Bilgileri Güncelle
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+        </section>
+
+        <!-- Sağ Panel: Analiz, Metrikler ve Grafikler (5 Kolon) -->
+        <section class="lg:col-span-5 space-y-6">
+
+            <!-- Özet Kartlar -->
+            <div class="grid grid-cols-2 gap-4">
+                <div class="bg-white p-4 rounded-xl shadow-sm border border-slate-200 flex flex-col justify-between">
+                    <span class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Seçili Ay Emisyonu</span>
+                    <div class="mt-2">
+                        <span id="monthlyTotalCO2" class="text-2xl font-black text-brand-700">0.00</span>
+                        <span class="text-xs font-semibold text-slate-500">Ton CO₂e</span>
+                    </div>
+                </div>
+                <div class="bg-white p-4 rounded-xl shadow-sm border border-slate-200 flex flex-col justify-between">
+                    <span class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Yıllık Toplam</span>
+                    <div class="mt-2">
+                        <span id="yearlyTotalCO2" class="text-2xl font-black text-slate-800">0.00</span>
+                        <span class="text-xs font-semibold text-slate-500">Ton CO₂e</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tekstil Özel Metriği: Birim Ürün Emisyonu -->
+            <div class="bg-gradient-to-br from-brand-900 to-slate-900 text-white p-5 rounded-xl shadow-md">
+                <div class="flex justify-between items-center mb-2">
+                    <span class="text-xs font-semibold text-brand-200 uppercase tracking-wider">Tekstil Ürün Yoğunluğu Metriği</span>
+                    <i class="fa-solid fa-shirt text-brand-400"></i>
+                </div>
+                <div class="flex items-baseline space-x-2">
+                    <span id="intensityMetric" class="text-3xl font-black text-white">0.00</span>
+                    <span class="text-xs font-medium text-brand-200">kg CO₂e / kg Kumaş</span>
+                </div>
+                <p class="text-[11px] text-slate-300 mt-2">Seçili ayda üretilen 1 kg tekstil ürünü başına oluşan doğrudan ve dolaylı karbon salınımı.</p>
+            </div>
+
+            <!-- Kapsam Dağılım Grafiği (Donut Chart) -->
+            <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200">
+                <h4 class="text-xs font-bold text-slate-700 uppercase tracking-wider mb-3">Kapsam Bazlı Dağılım (Scope 1 - 2 - 3)</h4>
+                <div class="relative h-56">
+                    <canvas id="scopeChart"></canvas>
+                </div>
+            </div>
+
+            <!-- Aylık Trend Grafiği (Bar Chart) -->
+            <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200">
+                <h4 class="text-xs font-bold text-slate-700 uppercase tracking-wider mb-3">Yıllık Emisyon Trendi (Ay Ay)</h4>
+                <div class="relative h-52">
+                    <canvas id="trendChart"></canvas>
+                </div>
+            </div>
+
+        </section>
+
+    </main>
+
+    <!-- Footer -->
+    <footer class="bg-white border-t border-slate-200 py-4 text-center text-xs text-slate-500">
+        <p>© Tekstil Fabrikası Karbon Ayak İzi Yönetim Sistemi | GHG Protocol Standardı Uyumlu</p>
+    </footer>
+
+    <!-- JAVASCRIPT MANTIĞI -->
+    <script>
+        // Varsayılan Emisyon Faktörleri Veritabanı
+        const defaultFactors = [
+            { id: 'f1', scope: 'Scope 1', name: 'Doğalgaz (Kazan / Boyahane)', unit: 'm³', value: 2.02 },
+            { id: 'f2', scope: 'Scope 1', name: 'Fuel-Oil (Buhar Kazanı)', unit: 'Litre', value: 3.15 },
+            { id: 'f3', scope: 'Scope 1', name: 'Kömür (Endüstriyel)', unit: 'kg', value: 2.45 },
+            { id: 'f4', scope: 'Scope 1', name: 'Fabrika Servis Araçları (Dizel)', unit: 'Litre', value: 2.68 },
+            { id: 'f5', scope: 'Scope 2', name: 'Şebeke Elektriği (Türkiye Şebekesi)', unit: 'kWh', value: 0.44 },
+            { id: 'f6', scope: 'Scope 2', name: 'Satın Alınan Buhar', unit: 'kWh', value: 0.27 },
+            { id: 'f7', scope: 'Scope 3', name: 'Uçak ile İş Seyakati (Kısa Mesafe)', unit: 'Yolcu-km', value: 0.25 },
+            { id: 'f8', scope: 'Scope 3', name: 'Uçak ile İş Seyakati (Uzun Mesafe)', unit: 'Yolcu-km', value: 0.18 },
+            { id: 'f9', scope: 'Scope 3', name: 'Konvansiyonel Pamuk İpliği Tedariği', unit: 'kg', value: 5.80 },
+            { id: 'f10', scope: 'Scope 3', name: 'Polyester Elyaf/İplik Tedariği', unit: 'kg', value: 4.20 },
+            { id: 'f11', scope: 'Scope 3', name: 'Lojistik / Tır Nakliye', unit: 'Ton-km', value: 0.11 },
+            { id: 'f12', scope: 'Scope 3', name: 'Atıksu Arıtma Emisyonu', unit: 'm³', value: 0.75 }
+        ];
+
+        // State Mantığı (Varsayılan değerler güncellendi)
+        let factoryProfile = JSON.parse(localStorage.getItem('txt_profile')) || {
+            name: 'Örnek Firma',
+            location: 'Örnek Şehir',
+            employees: 350
+        };
+
+        let factors = JSON.parse(localStorage.getItem('txt_factors')) || defaultFactors;
+        let records = JSON.parse(localStorage.getItem('txt_records')) || [];
+        let productionData = JSON.parse(localStorage.getItem('txt_production')) || {};
+        let customYears = JSON.parse(localStorage.getItem('txt_custom_years')) || [];
+
+        let scopeChartInstance = null;
+        let trendChartInstance = null;
+
+        // Başlangıç Yüklemeleri
+        document.addEventListener('DOMContentLoaded', () => {
+            renderYearOptions(); // Sonsuz/Dinamik Yıl Seçeneklerini Yükle
+            loadFactoryProfile();
+            renderFactorsTable();
+            updateFactorDropdown();
+            loadRecordsForCurrentPeriod();
+            initCharts();
+        });
+
+        // TAMAMEN DİNAMİK VE SONSUZ YIL SEÇİM ALANI
+        function renderYearOptions(selectedYearValue = null) {
+            const yearSelect = document.getElementById('selectYear');
+            const currentYear = new Date().getFullYear();
+            
+            // Veritabanındaki geçmiş kayıtlı tüm yılları topla
+            const recordYears = records.map(r => parseInt(r.year)).filter(y => !isNaN(y));
+            
+            // Mevcut yıl, gelecek 5 yıl, geçmiş 5 yıl ve veritabanında olan tüm özel yılları birleştir
+            let allYears = [currentYear];
+            for (let i = 1; i <= 5; i++) {
+                allYears.push(currentYear + i);
+                allYears.push(currentYear - i);
+            }
+            allYears = [...allYears, ...recordYears, ...customYears];
+            
+            // Tekrarları temizle ve büyükten küçüğe sırala
+            const uniqueYears = Array.from(new Set(allYears)).sort((a, b) => b - a);
+
+            const activeYear = selectedYearValue || yearSelect.value || currentYear.toString();
+
+            yearSelect.innerHTML = '';
+            uniqueYears.forEach(y => {
+                const opt = document.createElement('option');
+                opt.value = y;
+                opt.textContent = y;
+                if (y.toString() === activeYear.toString()) opt.selected = true;
+                yearSelect.appendChild(opt);
+            });
+            
+            // Manuel Ekle opsiyonu
+            const addOpt = document.createElement('option');
+            addOpt.value = 'ADD_NEW';
+            addOpt.textContent = '+ Diğer Yıl Ekle...';
+            yearSelect.appendChild(addOpt);
+        }
+
+        function handleYearChange() {
+            const yearSelect = document.getElementById('selectYear');
+            if (yearSelect.value === 'ADD_NEW') {
+                promptAddNewYear();
+            } else {
+                loadRecordsForCurrentPeriod();
+            }
+        }
+
+        function promptAddNewYear() {
+            const newY = prompt('Eklemek istediğiniz yılı giriniz (Örn: 2029, 2035 vb.):');
+            if (newY && !isNaN(newY) && newY.length === 4) {
+                const yearNum = parseInt(newY);
+                if (!customYears.includes(yearNum)) {
+                    customYears.push(yearNum);
+                    localStorage.setItem('txt_custom_years', JSON.stringify(customYears));
+                }
+                renderYearOptions(yearNum);
+                loadRecordsForCurrentPeriod();
+            } else if (newY) {
+                alert('Lütfen geçerli 4 haneli bir yıl giriniz.');
+                renderYearOptions();
+            } else {
+                renderYearOptions();
+            }
+        }
+
+        // Tab Değiştirme
+        function switchTab(tab) {
+            document.querySelectorAll('.tab-btn').forEach(btn => {
+                btn.classList.remove('active', 'border-brand-600', 'text-brand-700', 'font-semibold');
+                btn.classList.add('border-transparent', 'text-slate-500', 'font-medium');
+            });
+            document.getElementById(`tab-${tab}`).classList.add('active', 'border-brand-600', 'text-brand-700', 'font-semibold');
+
+            document.getElementById('view-entry').classList.add('hidden');
+            document.getElementById('view-factors').classList.add('hidden');
+            document.getElementById('view-profile').classList.add('hidden');
+
+            document.getElementById(`view-${tab}`).classList.remove('hidden');
+        }
+
+        // Fabrika Profil Fonksiyonları
+        function loadFactoryProfile() {
+            document.getElementById('profFactoryName').value = factoryProfile.name;
+            document.getElementById('profLocation').value = factoryProfile.location || '';
+            document.getElementById('profEmployees').value = factoryProfile.employees || '';
+            document.getElementById('headerFactoryName').textContent = factoryProfile.name;
+        }
+
+        function saveFactoryProfile(e) {
+            e.preventDefault();
+            factoryProfile.name = document.getElementById('profFactoryName').value;
+            factoryProfile.location = document.getElementById('profLocation').value;
+            factoryProfile.employees = document.getElementById('profEmployees').value;
+
+            localStorage.setItem('txt_profile', JSON.stringify(factoryProfile));
+            document.getElementById('headerFactoryName').textContent = factoryProfile.name;
+            alert('Fabrika bilgileri başarıyla güncellendi.');
+        }
+
+        // Faktör Yönetimi (Data Bölümü)
+        function renderFactorsTable() {
+            const tbody = document.getElementById('factorsTableBody');
+            tbody.innerHTML = '';
+            factors.forEach(f => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td class="p-3"><span class="px-2 py-0.5 rounded text-[10px] font-bold ${getScopeBadgeColor(f.scope)}">${f.scope}</span></td>
+                    <td class="p-3 font-semibold text-slate-800">${f.name}</td>
+                    <td class="p-3">${f.unit}</td>
+                    <td class="p-3 font-mono">${f.value}</td>
+                    <td class="p-3 text-right">
+                        <button onclick="deleteFactor('${f.id}')" class="text-rose-600 hover:text-rose-800"><i class="fa-solid fa-trash"></i></button>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        function addNewFactor(e) {
+            e.preventDefault();
+            const scope = document.getElementById('newFactorScope').value;
+            const name = document.getElementById('newFactorName').value.trim();
+            const unit = document.getElementById('newFactorUnit').value.trim();
+            const value = parseFloat(document.getElementById('newFactorValue').value);
+
+            if (!name || isNaN(value)) return;
+
+            const newFactor = {
+                id: 'f_' + Date.now(),
+                scope,
+                name,
+                unit,
+                value
+            };
+
+            factors.push(newFactor);
+            localStorage.setItem('txt_factors', JSON.stringify(factors));
+            
+            renderFactorsTable();
+            updateFactorDropdown();
+            document.getElementById('newFactorForm').reset();
+            alert('Yeni emisyon faktörü eklendi.');
+        }
+
+        function deleteFactor(id) {
+            if (!confirm('Bu faktörü silmek istediğinize emin misiniz?')) return;
+            factors = factors.filter(f => f.id !== id);
+            localStorage.setItem('txt_factors', JSON.stringify(factors));
+            renderFactorsTable();
+            updateFactorDropdown();
+        }
+
+        function getScopeBadgeColor(scope) {
+            if (scope === 'Scope 1') return 'bg-amber-100 text-amber-800';
+            if (scope === 'Scope 2') return 'bg-sky-100 text-sky-800';
+            return 'bg-purple-100 text-purple-800';
+        }
+
+        // Emisyon Girişi ve Hesaplama
+        function updateFactorDropdown() {
+            const scope = document.getElementById('entryScope').value;
+            const select = document.getElementById('entryFactorId');
+            select.innerHTML = '';
+
+            const filtered = factors.filter(f => f.scope === scope);
+            filtered.forEach(f => {
+                const opt = document.createElement('option');
+                opt.value = f.id;
+                opt.textContent = `${f.name} (${f.value} kg CO₂e/${f.unit})`;
+                select.appendChild(opt);
+            });
+
+            updateFactorUnitLabel();
+        }
+
+        function updateFactorUnitLabel() {
+            const factorId = document.getElementById('entryFactorId').value;
+            const factor = factors.find(f => f.id === factorId);
+            document.getElementById('unitLabel').textContent = factor ? factor.unit : '-';
+        }
+
+        function addEmissionRecord(e) {
+            e.preventDefault();
+            const year = document.getElementById('selectYear').value;
+            const month = document.getElementById('selectMonth').value;
+            const scope = document.getElementById('entryScope').value;
+            const factorId = document.getElementById('entryFactorId').value;
+            const amount = parseFloat(document.getElementById('entryAmount').value);
+
+            const factor = factors.find(f => f.id === factorId);
+            if (!factor || isNaN(amount)) return;
+
+            const co2eTon = (amount * factor.value) / 1000;
+
+            const record = {
+                id: 'r_' + Date.now(),
+                year,
+                month,
+                scope,
+                factorId,
+                factorName: factor.name,
+                unit: factor.unit,
+                factorValue: factor.value,
+                amount,
+                co2eTon
+            };
+
+            records.push(record);
+            localStorage.setItem('txt_records', JSON.stringify(records));
+
+            document.getElementById('entryAmount').value = '';
+            loadRecordsForCurrentPeriod();
+        }
+
+        function deleteRecord(id) {
+            records = records.filter(r => r.id !== id);
+            localStorage.setItem('txt_records', JSON.stringify(records));
+            loadRecordsForCurrentPeriod();
+        }
+
+        function saveMonthlyProduction() {
+            const year = document.getElementById('selectYear').value;
+            const month = document.getElementById('selectMonth').value;
+            const val = parseFloat(document.getElementById('monthlyProductionInput').value) || 0;
+
+            if (!productionData[year]) productionData[year] = {};
+            productionData[year][month] = val;
+
+            localStorage.setItem('txt_production', JSON.stringify(productionData));
+            updateMetricsAndCharts();
+        }
+
+        function loadRecordsForCurrentPeriod() {
+            const year = document.getElementById('selectYear').value;
+            const month = document.getElementById('selectMonth').value;
+
+            document.getElementById('currentPeriodLabel').textContent = `${year} - ${month}`;
+
+            const prod = (productionData[year] && productionData[year][month]) ? productionData[year][month] : '';
+            document.getElementById('monthlyProductionInput').value = prod;
+
+            const currentRecords = records.filter(r => r.year === year && r.month === month);
+            document.getElementById('recordCountBadge').textContent = `${currentRecords.length} Kayıt`;
+
+            const tbody = document.getElementById('recordsTableBody');
+            tbody.innerHTML = '';
+
+            currentRecords.forEach(r => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td class="p-3"><span class="px-2 py-0.5 rounded text-[10px] font-bold ${getScopeBadgeColor(r.scope)}">${r.scope}</span></td>
+                    <td class="p-3 font-semibold text-slate-800">${r.factorName}</td>
+                    <td class="p-3">${r.amount.toLocaleString('tr-TR')} ${r.unit}</td>
+                    <td class="p-3 font-mono">${r.factorValue}</td>
+                    <td class="p-3 font-bold text-slate-900">${r.co2eTon.toFixed(3)} t</td>
+                    <td class="p-3 text-right">
+                        <button onclick="deleteRecord('${r.id}')" class="text-rose-600 hover:text-rose-800"><i class="fa-solid fa-trash"></i></button>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+
+            updateMetricsAndCharts();
+        }
+
+        function updateMetricsAndCharts() {
+            const year = document.getElementById('selectYear').value;
+            const month = document.getElementById('selectMonth').value;
+
+            const monthRecords = records.filter(r => r.year === year && r.month === month);
+            const monthlyTotal = monthRecords.reduce((acc, curr) => acc + curr.co2eTon, 0);
+            document.getElementById('monthlyTotalCO2').textContent = monthlyTotal.toFixed(2);
+
+            const yearRecords = records.filter(r => r.year === year);
+            const yearlyTotal = yearRecords.reduce((acc, curr) => acc + curr.co2eTon, 0);
+            document.getElementById('yearlyTotalCO2').textContent = yearlyTotal.toFixed(2);
+
+            const prodTon = (productionData[year] && productionData[year][month]) ? parseFloat(productionData[year][month]) : 0;
+            if (prodTon > 0 && monthlyTotal > 0) {
+                const intensity = monthlyTotal / prodTon;
+                document.getElementById('intensityMetric').textContent = intensity.toFixed(2);
+            } else {
+                document.getElementById('intensityMetric').textContent = '0.00';
+            }
+
+            const s1 = monthRecords.filter(r => r.scope === 'Scope 1').reduce((a, b) => a + b.co2eTon, 0);
+            const s2 = monthRecords.filter(r => r.scope === 'Scope 2').reduce((a, b) => a + b.co2eTon, 0);
+            const s3 = monthRecords.filter(r => r.scope === 'Scope 3').reduce((a, b) => a + b.co2eTon, 0);
+
+            if (scopeChartInstance) {
+                scopeChartInstance.data.datasets[0].data = [s1, s2, s3];
+                scopeChartInstance.update();
+            }
+
+            const months = ['Ocak', 'Şubat', 'Mart', 'Nisan', 'Mayıs', 'Haziran', 'Temmuz', 'Ağustos', 'Eylül', 'Ekim', 'Kasım', 'Aralık'];
+            const trendData = months.map(m => {
+                return records.filter(r => r.year === year && r.month === m).reduce((a, b) => a + b.co2eTon, 0);
+            });
+
+            if (trendChartInstance) {
+                trendChartInstance.data.datasets[0].data = trendData;
+                trendChartInstance.update();
+            }
+        }
+
+        function initCharts() {
+            const ctxScope = document.getElementById('scopeChart').getContext('2d');
+            scopeChartInstance = new Chart(ctxScope, {
+                type: 'doughnut',
+                data: {
+                    labels: ['Kapsam 1 (Doğrudan)', 'Kapsam 2 (Enerji)', 'Kapsam 3 (Dolaylı)'],
+                    datasets: [{
+                        data: [0, 0, 0],
+                        backgroundColor: ['#f59e0b', '#0284c7', '#9333ea'],
+                        borderWidth: 0
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 10 } } }
+                    }
+                }
+            });
+
+            const ctxTrend = document.getElementById('trendChart').getContext('2d');
+            trendChartInstance = new Chart(ctxTrend, {
+                type: 'bar',
+                data: {
+                    labels: ['Oca', 'Şub', 'Mar', 'Nis', 'May', 'Haz', 'Tem', 'Ağu', 'Eyl', 'Eki', 'Kas', 'Ara'],
+                    datasets: [{
+                        label: 'Ton CO₂e',
+                        data: Array(12).fill(0),
+                        backgroundColor: '#22c55e',
+                        borderRadius: 4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false }
+                    },
+                    scales: {
+                        y: { beginAtZero: true, grid: { color: '#f1f5f9' } },
+                        x: { grid: { display: false } }
+                    }
+                }
+            });
+        }
+
+        function exportToExcel() {
+            const year = document.getElementById('selectYear').value;
+
+            const recordsData = records.map(r => ({
+                'Fabrika Adı': factoryProfile.name,
+                'Yıl': r.year,
+                'Ay': r.month,
+                'Kapsam (Scope)': r.scope,
+                'Emisyon Kalemi': r.factorName,
+                'Tüketim Miktarı': r.amount,
+                'Birim': r.unit,
+                'Emisyon Faktörü (kg CO2e/Birim)': r.factorValue,
+                'Toplam Emisyon (Ton CO2e)': parseFloat(r.co2eTon.toFixed(4))
+            }));
+
+            const factorsData = factors.map(f => ({
+                'Kapsam': f.scope,
+                'Faktör Adı': f.name,
+                'Birim': f.unit,
+                'Faktör Değeri (kg CO2e/Birim)': f.value
+            }));
+
+            const wb = XLSX.utils.book_new();
+            
+            const wsRecords = XLSX.utils.json_to_sheet(recordsData.length > 0 ? recordsData : [{ 'Mesaj': 'Kayıt bulunamadı' }]);
+            const wsFactors = XLSX.utils.json_to_sheet(factorsData);
+
+            XLSX.utils.book_append_sheet(wb, wsRecords, "Emisyon Kayıtları");
+            XLSX.utils.book_append_sheet(wb, wsFactors, "Faktör Veritabanı");
+
+            const fileName = `${factoryProfile.name.replace(/[^a-zA-Z0-9]/g, "_")}_Karbon_Raporu_${year}.xlsx`;
+            XLSX.writeFile(wb, fileName);
+        }
+
+        function resetAllData() {
+            if (confirm('Tüm kayıtlar, özel faktörler ve profil varsayılana sıfırlanacaktır. Onaylıyor musunuz?')) {
+                localStorage.clear();
+                location.reload();
+            }
+        }
+    </script>
+</body>
+</html>
